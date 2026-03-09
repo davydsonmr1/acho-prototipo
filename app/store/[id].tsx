@@ -14,14 +14,35 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { getStoreById, Store, Product } from '@/services/storeService';
 import { useCart } from '@/contexts/CartContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ReviewSection, { Review } from '@/components/ReviewSection';
 
 export default function StoreDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { addToCart } = useCart();
   const { favorites, toggleFavorite } = useFavorites();
+  const { user } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<Review[]>([
+    {
+      id: '1',
+      userId: 'mock-user-1',
+      userName: 'Ana Silva',
+      rating: 5,
+      comment: 'Produtos excelentes! Entrega rápida e tudo muito fresco.',
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: '2',
+      userId: 'mock-user-2',
+      userName: 'Carlos Souza',
+      rating: 4,
+      comment: 'Bom atendimento. Recomendo!',
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    },
+  ]);
 
   useEffect(() => {
     if (id) {
@@ -60,6 +81,19 @@ export default function StoreDetailsScreen() {
     if (store) {
       toggleFavorite(store.id);
     }
+  };
+
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    if (!user) return;
+    const newReview: Review = {
+      id: Date.now().toString(),
+      userId: user.id,
+      userName: user.name,
+      rating,
+      comment: comment || null,
+      createdAt: new Date(),
+    };
+    setReviews(prev => [newReview, ...prev]);
   };
 
   const formatPrice = (price: number) => {
@@ -194,6 +228,13 @@ export default function StoreDetailsScreen() {
             </View>
           )}
         </View>
+        {/* Reviews */}
+        <ReviewSection
+          reviews={reviews}
+          averageRating={store.rating}
+          onSubmitReview={handleSubmitReview}
+          canReview={!!user}
+        />
       </ScrollView>
     </SafeAreaView>
   );

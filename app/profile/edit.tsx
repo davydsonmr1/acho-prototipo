@@ -9,10 +9,12 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { ArrowLeft, User, Mail, Phone, MapPin } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Phone, MapPin, Camera } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function EditProfileScreen() {
   const { user, updateUser } = useAuth();
@@ -23,6 +25,20 @@ export default function EditProfileScreen() {
     address: user?.address || '',
   });
   const [loading, setLoading] = useState(false);
+  const [avatarUri, setAvatarUri] = useState(user?.avatarUrl || '');
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -51,6 +67,7 @@ export default function EditProfileScreen() {
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         address: formData.address.trim(),
+        avatarUrl: avatarUri || undefined,
       });
 
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso!', [
@@ -78,6 +95,21 @@ export default function EditProfileScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
+          {/* Avatar */}
+          <TouchableOpacity style={styles.avatarSection} onPress={pickImage}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <User size={32} color="#FFFFFF" />
+              </View>
+            )}
+            <View style={styles.cameraIcon}>
+              <Camera size={16} color="#FFFFFF" />
+            </View>
+            <Text style={styles.changePhotoText}>Alterar foto</Text>
+          </TouchableOpacity>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nome completo *</Text>
             <View style={styles.inputContainer}>
@@ -189,6 +221,44 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 8,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#E11D48',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    top: 70,
+    right: '35%',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  changePhotoText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
+    marginTop: 4,
   },
   inputGroup: {
     marginBottom: 20,

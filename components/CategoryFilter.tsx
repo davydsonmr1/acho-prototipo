@@ -19,7 +19,7 @@ interface CategoryFilterProps {
   onSelectCategory: (categoryId: string) => void;
 }
 
-export default function CategoryFilter({ 
+function CategoryFilterComponent({ 
   categories, 
   selectedCategory, 
   onSelectCategory 
@@ -55,6 +55,8 @@ export default function CategoryFilter({
     </View>
   );
 }
+
+export default React.memo(CategoryFilterComponent);
 
 const styles = StyleSheet.create({
   container: {

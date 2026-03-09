@@ -43,6 +43,16 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Valida que todos os itens são da mesma loja
+    const storeIds = [...new Set(cartItems.map(item => item.storeId))];
+    if (storeIds.length > 1) {
+      Alert.alert(
+        'Itens de lojas diferentes',
+        'Seu carrinho contém itens de lojas diferentes. Por favor, finalize um pedido por loja.',
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const orderId = await createOrder({

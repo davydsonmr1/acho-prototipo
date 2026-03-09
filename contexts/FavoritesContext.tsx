@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isFirebaseConfigured, db } from '@/services/firebase';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
 
 interface FavoritesContextData {
   favorites: string[];
@@ -11,17 +14,19 @@ interface FavoritesContextData {
 const FavoritesContext = createContext<FavoritesContextData>({} as FavoritesContextData);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     loadFavorites();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     saveFavorites();
   }, [favorites]);
 
   const loadFavorites = async () => {
+    // Primeiro carrega do cache local
     try {
       const storedFavorites = await AsyncStorage.getItem('@acho:favorites');
       if (storedFavorites) {
@@ -29,6 +34,22 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Erro ao carregar favoritos:', error);
+    }
+
+    // Depois sincroniza com Firestore
+    if (isFirebaseConfigured && db && user) {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.favoriteStoreIds && Array.isArray(data.favoriteStoreIds)) {
+            setFavorites(data.favoriteStoreIds);
+            await AsyncStorage.setItem('@acho:favorites', JSON.stringify(data.favoriteStoreIds));
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao sincronizar favoritos com Firestore:', error);
+      }
     }
   };
 
@@ -40,12 +61,29 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const syncFavoritesToFirestore = async (newFavorites: string[]) => {
+    if (isFirebaseConfigured && db && user) {
+      try {
+        await updateDoc(doc(db, 'users', user.id), {
+          favoriteStoreIds: newFavorites,
+          updatedAt: new Date(),
+        });
+      } catch (error) {
+        console.error('Erro ao sincronizar favoritos com Firestore:', error);
+      }
+    }
+  };
+
   const addToFavorites = (storeId: string) => {
-    setFavorites(prev => [...prev, storeId]);
+    const updated = [...favorites, storeId];
+    setFavorites(updated);
+    syncFavoritesToFirestore(updated);
   };
 
   const removeFromFavorites = (storeId: string) => {
-    setFavorites(prev => prev.filter(id => id !== storeId));
+    const updated = favorites.filter(id => id !== storeId);
+    setFavorites(updated);
+    syncFavoritesToFirestore(updated);
   };
 
   const toggleFavorite = (storeId: string) => {

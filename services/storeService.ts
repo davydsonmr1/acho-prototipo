@@ -1,4 +1,16 @@
-// Simulação do serviço de lojas - em produção, usar Firebase Firestore
+// Serviço de lojas - Firebase Firestore com fallback para mock
+
+import { isFirebaseConfigured, db } from '@/services/firebase';
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  query,
+  where,
+  orderBy,
+} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Product {
   id: string;
@@ -6,6 +18,8 @@ export interface Product {
   price: number;
   image: string;
   description: string;
+  category?: string;
+  isAvailable?: boolean;
 }
 
 export interface Store {
@@ -14,12 +28,21 @@ export interface Store {
   category: string;
   image: string;
   rating: number;
+  totalRatings?: number;
   description: string;
   address: string;
   phone: string;
   isOpen: boolean;
   products: Product[];
+  deliveryFee?: number;
+  minimumOrder?: number;
+  estimatedDeliveryTime?: string;
+  location?: { latitude: number; longitude: number };
+  tags?: string[];
 }
+
+const STORES_CACHE_KEY = '@acho:stores_cache';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // Dados mockados para demonstração
 const MOCK_STORES: Store[] = [
@@ -33,6 +56,7 @@ const MOCK_STORES: Store[] = [
     address: 'Rua das Flores, 123 - Centro',
     phone: '(11) 99999-0001',
     isOpen: true,
+    location: { latitude: -23.5505, longitude: -46.6333 },
     products: [
       {
         id: '1',
@@ -67,6 +91,7 @@ const MOCK_STORES: Store[] = [
     address: 'Rua do Comércio, 456 - São João',
     phone: '(11) 99999-0002',
     isOpen: true,
+    location: { latitude: -23.5540, longitude: -46.6380 },
     products: [
       {
         id: '4',
@@ -101,6 +126,7 @@ const MOCK_STORES: Store[] = [
     address: 'Av. Principal, 789 - Vila Nova',
     phone: '(11) 99999-0003',
     isOpen: true,
+    location: { latitude: -23.5570, longitude: -46.6290 },
     products: [
       {
         id: '7',
@@ -128,6 +154,7 @@ const MOCK_STORES: Store[] = [
     address: 'Rua da Escola, 321 - Centro',
     phone: '(11) 99999-0004',
     isOpen: false,
+    location: { latitude: -23.5600, longitude: -46.6450 },
     products: [
       {
         id: '9',
@@ -155,6 +182,7 @@ const MOCK_STORES: Store[] = [
     address: 'Rua Italiana, 555 - Bela Vista',
     phone: '(11) 99999-0005',
     isOpen: true,
+    location: { latitude: -23.5480, longitude: -46.6410 },
     products: [
       {
         id: '11',
@@ -175,23 +203,185 @@ const MOCK_STORES: Store[] = [
 ];
 
 export const getStores = async (): Promise<Store[]> => {
-  // Simula delay de rede
+  if (isFirebaseConfigured && db) {
+    try {
+      const storesQuery = query(
+        collection(db, 'stores'),
+        where('isActive', '==', true)
+      );
+      const snapshot = await getDocs(storesQuery);
+      const stores: Store[] = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        // Busca produtos da subcollection
+        const productsSnap = await getDocs(
+          query(collection(db, 'stores', docSnap.id, 'products'))
+        );
+        const products: Product[] = productsSnap.docs.map(p => ({
+          id: p.id,
+          ...p.data(),
+        })) as Product[];
+
+        stores.push({
+          id: docSnap.id,
+          name: data.name,
+          category: data.category,
+          image: data.imageUrl || data.image,
+          rating: data.rating || 0,
+          totalRatings: data.totalRatings || 0,
+          description: data.description,
+          address: data.address,
+          phone: data.phone,
+          isOpen: data.isOpen ?? true,
+          products,
+          deliveryFee: data.deliveryFee,
+          minimumOrder: data.minimumOrder,
+          estimatedDeliveryTime: data.estimatedDeliveryTime,
+          location: data.location
+            ? { latitude: data.location.latitude, longitude: data.location.longitude }
+            : undefined,
+          tags: data.tags,
+        });
+      }
+      // Cache local
+      await AsyncStorage.setItem(
+        STORES_CACHE_KEY,
+        JSON.stringify({ data: stores, timestamp: Date.now() })
+      );
+      return stores;
+    } catch (error) {
+      console.error('Erro ao buscar lojas do Firestore:', error);
+      // Tenta cache
+      const cached = await getCachedStores();
+      if (cached) return cached;
+      return MOCK_STORES;
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 500));
   return MOCK_STORES;
 };
 
+async function getCachedStores(): Promise<Store[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(STORES_CACHE_KEY);
+    if (raw) {
+      const { data, timestamp } = JSON.parse(raw);
+      if (Date.now() - timestamp < CACHE_DURATION) return data;
+    }
+  } catch {}
+  return null;
+}
+
 export const getStoreById = async (id: string): Promise<Store | null> => {
+  if (isFirebaseConfigured && db) {
+    try {
+      const storeDoc = await getDoc(doc(db, 'stores', id));
+      if (!storeDoc.exists()) return null;
+      const data = storeDoc.data();
+      const productsSnap = await getDocs(collection(db, 'stores', id, 'products'));
+      const products: Product[] = productsSnap.docs.map(p => ({
+        id: p.id,
+        ...p.data(),
+      })) as Product[];
+      return {
+        id: storeDoc.id,
+        name: data.name,
+        category: data.category,
+        image: data.imageUrl || data.image,
+        rating: data.rating || 0,
+        totalRatings: data.totalRatings || 0,
+        description: data.description,
+        address: data.address,
+        phone: data.phone,
+        isOpen: data.isOpen ?? true,
+        products,
+        deliveryFee: data.deliveryFee,
+        minimumOrder: data.minimumOrder,
+        estimatedDeliveryTime: data.estimatedDeliveryTime,
+        location: data.location
+          ? { latitude: data.location.latitude, longitude: data.location.longitude }
+          : undefined,
+        tags: data.tags,
+      };
+    } catch (error) {
+      console.error('Erro ao buscar loja do Firestore:', error);
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 300));
   return MOCK_STORES.find(store => store.id === id) || null;
 };
 
 export const getStoresByIds = async (ids: string[]): Promise<Store[]> => {
+  if (isFirebaseConfigured && db) {
+    try {
+      const stores: Store[] = [];
+      for (const id of ids) {
+        const store = await getStoreById(id);
+        if (store) stores.push(store);
+      }
+      return stores;
+    } catch {
+      // fallback
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 300));
   return MOCK_STORES.filter(store => ids.includes(store.id));
 };
 
 export const getStoresByCategory = async (category: string): Promise<Store[]> => {
+  if (isFirebaseConfigured && db) {
+    try {
+      let storesQuery;
+      if (category === 'all') {
+        storesQuery = query(collection(db, 'stores'), where('isActive', '==', true));
+      } else {
+        storesQuery = query(
+          collection(db, 'stores'),
+          where('category', '==', category),
+          where('isActive', '==', true)
+        );
+      }
+      const snapshot = await getDocs(storesQuery);
+      const stores: Store[] = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const productsSnap = await getDocs(collection(db, 'stores', docSnap.id, 'products'));
+        const products: Product[] = productsSnap.docs.map(p => ({
+          id: p.id,
+          ...p.data(),
+        })) as Product[];
+        stores.push({
+          id: docSnap.id,
+          name: data.name,
+          category: data.category,
+          image: data.imageUrl || data.image,
+          rating: data.rating || 0,
+          description: data.description,
+          address: data.address,
+          phone: data.phone,
+          isOpen: data.isOpen ?? true,
+          products,
+        });
+      }
+      return stores;
+    } catch {
+      // fallback
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 300));
   if (category === 'all') return MOCK_STORES;
   return MOCK_STORES.filter(store => store.category === category);
+};
+
+// Busca lojas por texto (nome, categoria, produtos)
+export const searchStores = async (queryText: string, stores: Store[]): Promise<Store[]> => {
+  const q = queryText.toLowerCase().trim();
+  if (!q) return stores;
+  return stores.filter(store =>
+    store.name.toLowerCase().includes(q) ||
+    store.category.toLowerCase().includes(q) ||
+    store.description.toLowerCase().includes(q) ||
+    store.products.some(p => p.name.toLowerCase().includes(q)) ||
+    (store.tags && store.tags.some(t => t.toLowerCase().includes(q)))
+  );
 };

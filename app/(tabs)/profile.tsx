@@ -7,8 +7,9 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
-import { User, MapPin, Phone, Mail, ShoppingBag, Heart, Settings, CircleHelp as HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
+import { User, MapPin, Phone, Mail, ShoppingBag, Heart, Settings, CircleHelp as HelpCircle, LogOut, ChevronRight, Store } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -48,9 +49,13 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <User size={32} color="#FFFFFF" />
-            </View>
+            {user?.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <User size={32} color="#FFFFFF" />
+              </View>
+            )}
           </View>
           <Text style={styles.userName}>{user?.name || 'Usuário'}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
@@ -131,6 +136,14 @@ export default function ProfileScreen() {
               <View style={styles.menuItemLeft}>
                 <HelpCircle size={20} color="#6B7280" />
                 <Text style={styles.menuItemText}>Ajuda e Suporte</Text>
+              </View>
+              <ChevronRight size={16} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/store-owner')}>
+              <View style={styles.menuItemLeft}>
+                <Store size={20} color="#6B7280" />
+                <Text style={styles.menuItemText}>Painel do Lojista</Text>
               </View>
               <ChevronRight size={16} color="#9CA3AF" />
             </TouchableOpacity>

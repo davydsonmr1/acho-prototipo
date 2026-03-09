@@ -8,10 +8,12 @@ import {
   SafeAreaView,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
-import { ArrowLeft, Clock, CircleCheck as CheckCircle, Truck, Package, ShoppingBag } from 'lucide-react-native';
+import { ArrowLeft, Clock, CircleCheck as CheckCircle, Truck, Package, ShoppingBag, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { getUserOrders, Order, OrderStatus } from '@/services/orderService';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -48,11 +50,15 @@ const ORDER_STATUS_CONFIG = {
   },
 };
 
+type FilterTab = 'all' | 'active' | 'completed' | 'cancelled';
+
 export default function OrderHistoryScreen() {
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
   useEffect(() => {
     if (user) {
@@ -95,6 +101,36 @@ export default function OrderHistoryScreen() {
     router.push(`/order/${orderId}`);
   };
 
+  const handleReorder = (order: Order) => {
+    for (const item of order.items) {
+      addToCart({
+        id: item.id,
+        storeId: item.storeId,
+        storeName: item.storeName,
+        name: item.name,
+        image: item.image,
+        price: item.price,
+      });
+    }
+    Alert.alert('Itens adicionados!', 'Os itens do pedido foram adicionados ao carrinho.', [
+      { text: 'Ver carrinho', onPress: () => router.push('/(tabs)/cart') },
+      { text: 'Continuar', style: 'cancel' },
+    ]);
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    switch (activeFilter) {
+      case 'active':
+        return [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.OUT_FOR_DELIVERY].includes(order.status);
+      case 'completed':
+        return order.status === OrderStatus.DELIVERED;
+      case 'cancelled':
+        return order.status === OrderStatus.CANCELLED;
+      default:
+        return true;
+    }
+  });
+
   if (loading) {
     return <LoadingSpinner text="Carregando pedidos..." />;
   }
@@ -110,6 +146,21 @@ export default function OrderHistoryScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Meus Pedidos</Text>
       </View>
+
+      {/* Filter tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterTabs}>
+        {([['all', 'Todos'], ['active', 'Em andamento'], ['completed', 'Finalizados'], ['cancelled', 'Cancelados']] as const).map(([key, label]) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.filterTab, activeFilter === key && styles.filterTabActive]}
+            onPress={() => setActiveFilter(key)}
+          >
+            <Text style={[styles.filterTabText, activeFilter === key && styles.filterTabTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {orders.length === 0 ? (
         <View style={styles.emptyState}>
@@ -133,7 +184,7 @@ export default function OrderHistoryScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {orders.map((order) => {
+          {filteredOrders.map((order) => {
             const statusConfig = ORDER_STATUS_CONFIG[order.status];
             const StatusIcon = statusConfig.icon;
 
@@ -165,6 +216,16 @@ export default function OrderHistoryScreen() {
                   </Text>
                   <Text style={styles.orderTotal}>{formatPrice(order.total)}</Text>
                 </View>
+
+                {order.status === OrderStatus.DELIVERED && (
+                  <TouchableOpacity
+                    style={styles.reorderButton}
+                    onPress={() => handleReorder(order)}
+                  >
+                    <RefreshCw size={14} color="#E11D48" />
+                    <Text style={styles.reorderText}>Repetir pedido</Text>
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -302,6 +363,44 @@ const styles = StyleSheet.create({
   shopButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  filterTabs: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexGrow: 0,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    marginRight: 8,
+  },
+  filterTabActive: {
+    backgroundColor: '#E11D48',
+  },
+  filterTabText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  filterTabTextActive: {
+    color: '#FFFFFF',
+  },
+  reorderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    gap: 6,
+  },
+  reorderText: {
+    fontSize: 14,
+    color: '#E11D48',
     fontWeight: '600',
   },
 });

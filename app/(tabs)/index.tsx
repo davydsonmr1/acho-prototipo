@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,15 @@ import {
   SafeAreaView,
   RefreshControl,
 } from 'react-native';
-import { Search, MapPin, Star, Clock } from 'lucide-react-native';
+import { Search, MapPin, Star, Clock, SlidersHorizontal } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
-import { getStores, Store } from '@/services/storeService';
+import { getStores, Store, searchStores } from '@/services/storeService';
 import StoreCard from '@/components/StoreCard';
 import CategoryFilter from '@/components/CategoryFilter';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useLocation, calculateDistance, formatDistance } from '@/hooks/useLocation';
 
 const CATEGORIES = [
   { id: 'all', name: 'Todos', icon: '🏪' },
@@ -28,23 +29,25 @@ const CATEGORIES = [
   { id: 'restaurante', name: 'Restaurantes', icon: '🍽️' },
 ];
 
+type SortOption = 'rating' | 'name' | 'distance' | 'default';
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const { favorites } = useFavorites();
   const [stores, setStores] = useState<Store[]>([]);
-  const [filteredStores, setFilteredStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [showFilters, setShowFilters] = useState(false);
+  const { location, requestLocation } = useLocation();
 
   useEffect(() => {
     loadStores();
+    requestLocation();
   }, []);
-
-  useEffect(() => {
-    filterStores();
-  }, [stores, searchQuery, selectedCategory]);
 
   const loadStores = async () => {
     try {
@@ -63,26 +66,58 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const filterStores = () => {
+  // Busca e filtragem com useMemo para performance
+  const filteredStores = useMemo(() => {
     let filtered = stores;
 
+    // Filtro de categoria
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(store => store.category === selectedCategory);
     }
 
+    // Busca por texto (nome da loja, categoria, produtos)
     if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(store =>
-        store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        store.category.toLowerCase().includes(searchQuery.toLowerCase())
+        store.name.toLowerCase().includes(q) ||
+        store.category.toLowerCase().includes(q) ||
+        store.description.toLowerCase().includes(q) ||
+        store.products.some(p => p.name.toLowerCase().includes(q))
       );
     }
 
-    setFilteredStores(filtered);
-  };
+    // Filtro "aberto agora"
+    if (showOpenOnly) {
+      filtered = filtered.filter(store => store.isOpen);
+    }
 
-  const handleStorePress = (storeId: string) => {
+    // Ordenação
+    switch (sortBy) {
+      case 'rating':
+        filtered = [...filtered].sort((a, b) => b.rating - a.rating);
+        break;
+      case 'name':
+        filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'distance':
+        if (location) {
+          filtered = [...filtered].sort((a, b) => {
+            const distA = a.location ? calculateDistance(location.latitude, location.longitude, a.location.latitude, a.location.longitude) : Infinity;
+            const distB = b.location ? calculateDistance(location.latitude, location.longitude, b.location.latitude, b.location.longitude) : Infinity;
+            return distA - distB;
+          });
+        }
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  }, [stores, searchQuery, selectedCategory, showOpenOnly, sortBy, location]);
+
+  const handleStorePress = useCallback((storeId: string) => {
     router.push(`/store/${storeId}`);
-  };
+  }, []);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -98,10 +133,12 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.locationContainer}>
+          <TouchableOpacity style={styles.locationContainer} onPress={requestLocation}>
             <MapPin size={16} color="#6B7280" />
-            <Text style={styles.locationText}>Sua localização</Text>
-          </View>
+            <Text style={styles.locationText}>
+              {location ? 'Localização obtida' : 'Obter localização'}
+            </Text>
+          </TouchableOpacity>
           <Text style={styles.welcomeText}>
             Olá, {user?.name || 'Usuário'}! 👋
           </Text>
@@ -113,12 +150,61 @@ export default function HomeScreen() {
             <Search size={20} color="#6B7280" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar lojas..."
+              placeholder="Buscar lojas ou produtos..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholderTextColor="#9CA3AF"
             />
+            <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
+              <SlidersHorizontal size={20} color={showFilters ? '#E11D48' : '#6B7280'} />
+            </TouchableOpacity>
           </View>
+
+          {/* Filtros avançados */}
+          {showFilters && (
+            <View style={styles.filtersRow}>
+              <TouchableOpacity
+                style={[styles.filterChip, showOpenOnly && styles.filterChipActive]}
+                onPress={() => setShowOpenOnly(!showOpenOnly)}
+              >
+                <Clock size={14} color={showOpenOnly ? '#FFFFFF' : '#6B7280'} />
+                <Text style={[styles.filterChipText, showOpenOnly && styles.filterChipTextActive]}>
+                  Abertos agora
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.filterChip, sortBy === 'rating' && styles.filterChipActive]}
+                onPress={() => setSortBy(sortBy === 'rating' ? 'default' : 'rating')}
+              >
+                <Star size={14} color={sortBy === 'rating' ? '#FFFFFF' : '#6B7280'} />
+                <Text style={[styles.filterChipText, sortBy === 'rating' && styles.filterChipTextActive]}>
+                  Melhor avaliados
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.filterChip, sortBy === 'name' && styles.filterChipActive]}
+                onPress={() => setSortBy(sortBy === 'name' ? 'default' : 'name')}
+              >
+                <Text style={[styles.filterChipText, sortBy === 'name' && styles.filterChipTextActive]}>
+                  A-Z
+                </Text>
+              </TouchableOpacity>
+
+              {location && (
+                <TouchableOpacity
+                  style={[styles.filterChip, sortBy === 'distance' && styles.filterChipActive]}
+                  onPress={() => setSortBy(sortBy === 'distance' ? 'default' : 'distance')}
+                >
+                  <MapPin size={14} color={sortBy === 'distance' ? '#FFFFFF' : '#6B7280'} />
+                  <Text style={[styles.filterChipText, sortBy === 'distance' && styles.filterChipTextActive]}>
+                    Mais perto
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Category Filter */}
@@ -170,14 +256,20 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.storesGrid}>
-              {filteredStores.map((store) => (
-                <StoreCard
-                  key={store.id}
-                  store={store}
-                  isFavorite={favorites.includes(store.id)}
-                  onPress={() => handleStorePress(store.id)}
-                />
-              ))}
+              {filteredStores.map((store) => {
+                const dist = location && store.location
+                  ? formatDistance(calculateDistance(location.latitude, location.longitude, store.location.latitude, store.location.longitude))
+                  : undefined;
+                return (
+                  <StoreCard
+                    key={store.id}
+                    store={store}
+                    isFavorite={favorites.includes(store.id)}
+                    onPress={() => handleStorePress(store.id)}
+                    distance={dist}
+                  />
+                );
+              })}
             </View>
           )}
         </View>
@@ -291,5 +383,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 4,
+  },
+  filterChipActive: {
+    backgroundColor: '#E11D48',
+    borderColor: '#E11D48',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
   },
 });

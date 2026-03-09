@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ArrowLeft, Clock, CircleCheck as CheckCircle, Truck, Package, MapPin, Phone } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getOrderById, Order, OrderStatus } from '@/services/orderService';
+import { getOrderById, subscribeToOrder, Order, OrderStatus } from '@/services/orderService';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 const ORDER_STATUS_CONFIG = {
@@ -62,6 +62,13 @@ export default function OrderDetailsScreen() {
   useEffect(() => {
     if (id) {
       loadOrder();
+      // Subscription real-time para acompanhar mudanças de status
+      const unsubscribe = subscribeToOrder(id, (updatedOrder) => {
+        if (updatedOrder) {
+          setOrder(updatedOrder);
+        }
+      });
+      return () => unsubscribe();
     }
   }, [id]);
 

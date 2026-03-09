@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { Star, Clock, Heart } from 'lucide-react-native';
+import { Star, Clock, Heart, MapPin } from 'lucide-react-native';
 import { Store } from '@/services/storeService';
 import { useFavorites } from '@/contexts/FavoritesContext';
 
@@ -14,9 +14,10 @@ interface StoreCardProps {
   store: Store;
   isFavorite: boolean;
   onPress: () => void;
+  distance?: string;
 }
 
-export default function StoreCard({ store, isFavorite, onPress }: StoreCardProps) {
+function StoreCardComponent({ store, isFavorite, onPress, distance }: StoreCardProps) {
   const { toggleFavorite } = useFavorites();
 
   const handleFavoritePress = (e: any) => {
@@ -64,11 +65,20 @@ export default function StoreCard({ store, isFavorite, onPress }: StoreCardProps
               {store.isOpen ? "Aberto" : "Fechado"}
             </Text>
           </View>
+
+          {distance && (
+            <View style={styles.distance}>
+              <MapPin size={14} color="#6B7280" />
+              <Text style={styles.distanceText}>{distance}</Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
   );
 }
+
+export default React.memo(StoreCardComponent);
 
 const styles = StyleSheet.create({
   container: {
@@ -149,6 +159,16 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 4,
+  },
+  distance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
     marginLeft: 4,
   },
 });
