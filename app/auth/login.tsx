@@ -12,6 +12,7 @@ import {
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -128,6 +129,14 @@ export default function LoginScreen() {
             <Text style={styles.footerLink}>Criar conta</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <GoogleSignInButton label="Entrar com Google" />
       </View>
     </SafeAreaView>
   );
@@ -231,5 +240,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#E11D48',
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingHorizontal: 0,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });

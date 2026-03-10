@@ -6,6 +6,8 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  signInWithCredential,
+  GoogleAuthProvider,
   FirebaseError,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
@@ -25,6 +27,7 @@ interface AuthContextData {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, phone?: string, address?: string) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signOut: () => void;
   updateUser: (userData: Partial<User>) => Promise<void>;
 }
@@ -222,6 +225,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async (idToken: string) => {
+    if (!isFirebaseConfigured || !firebaseAuth || !db) {
+      throw new Error('Firebase não configurado. Verifique as variáveis de ambiente.');
+    }
+    const credential = GoogleAuthProvider.credential(idToken);
+    const result = await signInWithCredential(firebaseAuth, credential);
+
+    // Cria documento no Firestore se for o primeiro login com Google
+    const userDocRef = doc(db, 'users', result.user.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) {
+      await setDoc(userDocRef, {
+        name: result.user.displayName || '',
+        email: result.user.email || '',
+        phone: null,
+        address: null,
+        avatarUrl: result.user.photoURL || null,
+        role: 'customer',
+        notificationsEnabled: true,
+        locationEnabled: false,
+        favoriteStoreIds: [],
+        defaultDeliveryAddress: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    // onAuthStateChanged cuida de atualizar o estado do usuário
+  };
+
   const signOut = async () => {
     if (isFirebaseConfigured && firebaseAuth) {
       try {
@@ -261,6 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
         updateUser,
       }}

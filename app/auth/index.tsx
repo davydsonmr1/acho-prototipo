@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ShoppingBag, MapPin, Clock } from 'lucide-react-native';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function AuthWelcomeScreen() {
   return (
@@ -63,6 +64,14 @@ export default function AuthWelcomeScreen() {
         >
           <Text style={styles.secondaryButtonText}>Já tenho conta</Text>
         </TouchableOpacity>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <GoogleSignInButton />
       </View>
     </SafeAreaView>
   );
@@ -153,5 +162,21 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontSize: 16,
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });
