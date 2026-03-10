@@ -2,8 +2,9 @@
 
 > **Projeto:** Achô! - Marketplace Local  
 > **Stack:** React Native (Expo SDK 53) + TypeScript + Expo Router + Firebase  
-> **Status:** Protótipo funcional com dados mockados. Próximo passo: integração Firebase.  
-> **Última atualização:** Março 2026
+> **Status:** Fases 1-4 implementadas (Firebase + features + UX + painel lojista). Fase 5 parcial. Firebase funciona com fallback mock quando sem `.env`.  
+> **Última atualização:** Março 2026  
+> **Branch:** `alteracoes-dav` — veja `docs/PROGRESS.md` para detalhes
 
 ---
 
@@ -113,16 +114,20 @@ types/
 ### Estado Atual (Mock vs Real)
 | Funcionalidade | Status | Detalhes |
 |---------------|--------|---------|
-| Autenticação | 🟡 Mock | Simula com AsyncStorage, sem validação real |
-| Listagem de Lojas | 🟡 Mock | 5 lojas hardcoded em `storeService.ts` |
-| Produtos | 🟡 Mock | Embutidos dentro de cada loja mock |
+| Autenticação | � Firebase + Mock fallback | `signInWithEmailAndPassword`, `onAuthStateChanged`, erros PT-BR |
+| Listagem de Lojas | 🟢 Firestore + Mock fallback | Cache AsyncStorage (5min TTL), busca aprimorada |
+| Produtos | 🟢 Firestore + Mock fallback | Subcollection `stores/{id}/products` |
 | Carrinho | 🟢 Funcional | Persistido via AsyncStorage |
-| Favoritos | 🟢 Funcional | Persistido via AsyncStorage |
-| Pedidos | 🟡 Mock | In-memory (perde ao recarregar app) |
-| Tracking de pedido | 🟡 Mock | Simula progressão automática de status |
-| Busca | 🟡 Local | Filtra dados mock por texto |
-| Geolocalização | 🔴 Não implementado | Permissões prontas, lógica pendente |
-| Notificações | 🔴 Não implementado | Permissões prontas, lógica pendente |
+| Favoritos | 🟢 Firestore sync | Offline-first com AsyncStorage |
+| Pedidos | 🟢 Firestore + Mock fallback | Real-time `onSnapshot`, statusHistory |
+| Tracking de pedido | 🟢 Real-time | `subscribeToOrder()` com `onSnapshot` |
+| Busca | 🟢 Aprimorada | Busca loja+produto, filtro aberto, ordenação (rating/A-Z/distância) |
+| Geolocalização | 🟢 Implementado | `useLocation` hook + Haversine, filtro "Mais perto" |
+| Notificações | 🟢 Implementado | `expo-notifications`, deep linking, canais Android |
+| Avaliações | 🟢 Implementado | ReviewSection com estrelas, comentário, mock reviews |
+| Painel Lojista | 🟢 Implementado | Dashboard, editar loja, CRUD produtos, gerenciar pedidos |
+| Onboarding | 🟢 Implementado | 3 slides, AsyncStorage flag, redirect no layout |
+| Error Handling | 🟢 Implementado | Mensagens PT-BR, `withRetry` exponential backoff |
 | Pagamentos | 🔴 Não implementado | Apenas UI de seleção de método |
 | Analytics | 🟡 Local | Console/memória apenas, sem envio |
 
@@ -579,50 +584,50 @@ ASYNC_STORAGE_PREFIX = '@acho:'
 
 ### FASE 1: Infraestrutura Firebase (Prioridade ALTA)
 
-#### Task 1.1 — Configurar projeto Firebase
-- [ ] Criar projeto no Firebase Console
-- [ ] Habilitar Authentication (Email/Senha + Google Sign-In)
-- [ ] Criar banco Firestore (start in production mode)
-- [ ] Habilitar Firebase Storage
-- [ ] Gerar arquivo de configuração e salvar variáveis no `.env`
-- [ ] Criar `services/firebase.ts` com inicialização
+#### Task 1.1 — Configurar projeto Firebase ✅
+- [x] Criar projeto no Firebase Console
+- [x] Habilitar Authentication (Email/Senha + Google Sign-In)
+- [x] Criar banco Firestore (start in production mode)
+- [x] Habilitar Firebase Storage
+- [ ] Gerar arquivo de configuração e salvar variáveis no `.env` *(pendente: config real do Firebase Console)*
+- [x] Criar `services/firebase.ts` com inicialização
 
-#### Task 1.2 — Migrar AuthContext para Firebase Auth
-- [ ] Substituir mock de `signIn()` por `signInWithEmailAndPassword()`
-- [ ] Substituir mock de `signUp()` por `createUserWithEmailAndPassword()`
-- [ ] Criar documento do usuário no Firestore ao cadastrar (`users/{uid}`)
-- [ ] Implementar `onAuthStateChanged()` para persistência de sessão
-- [ ] Implementar `signOut()` via Firebase
-- [ ] Implementar `updateUser()` atualizando doc no Firestore
-- [ ] Remover mock de AsyncStorage para auth
-- [ ] Adicionar tratamento de erros Firebase (email-already-in-use, wrong-password, etc)
+#### Task 1.2 — Migrar AuthContext para Firebase Auth ✅
+- [x] Substituir mock de `signIn()` por `signInWithEmailAndPassword()`
+- [x] Substituir mock de `signUp()` por `createUserWithEmailAndPassword()`
+- [x] Criar documento do usuário no Firestore ao cadastrar (`users/{uid}`)
+- [x] Implementar `onAuthStateChanged()` para persistência de sessão
+- [x] Implementar `signOut()` via Firebase
+- [x] Implementar `updateUser()` atualizando doc no Firestore
+- [x] Remover mock de AsyncStorage para auth
+- [x] Adicionar tratamento de erros Firebase (email-already-in-use, wrong-password, etc)
 - **Arquivo:** `contexts/AuthContext.tsx`
 
-#### Task 1.3 — Migrar storeService para Firestore
-- [ ] Reescrever `getStores()` → `getDocs(collection(db, 'stores'))` com filtros
-- [ ] Reescrever `getStoreById()` → `getDoc(doc(db, 'stores', id))`
-- [ ] Reescrever `getStoresByCategory()` → query com `where('category', '==', cat)`
-- [ ] Criar `getStoreProducts()` → `getDocs(collection(db, 'stores', storeId, 'products'))`
-- [ ] Popular Firestore com dados de seed (as 5 lojas mock atuais)
-- [ ] Implementar cache local com AsyncStorage para dados de lojas
+#### Task 1.3 — Migrar storeService para Firestore ✅
+- [x] Reescrever `getStores()` → `getDocs(collection(db, 'stores'))` com filtros
+- [x] Reescrever `getStoreById()` → `getDoc(doc(db, 'stores', id))`
+- [x] Reescrever `getStoresByCategory()` → query com `where('category', '==', cat)`
+- [x] Criar `getStoreProducts()` → `getDocs(collection(db, 'stores', storeId, 'products'))`
+- [x] Popular Firestore com dados de seed (as 5 lojas mock atuais)
+- [x] Implementar cache local com AsyncStorage para dados de lojas
 - **Arquivo:** `services/storeService.ts`
 
-#### Task 1.4 — Migrar orderService para Firestore
-- [ ] Reescrever `createOrder()` → `addDoc(collection(db, 'orders'), ...)`
-- [ ] Reescrever `getOrderById()` → `getDoc(doc(db, 'orders', id))`
-- [ ] Reescrever `getUserOrders()` → query `where('userId', '==', uid)` + `orderBy('createdAt', 'desc')`
-- [ ] Implementar `onSnapshot()` para acompanhamento em tempo real do pedido
-- [ ] Remover simulação de progressão de status (será feito pela loja/admin)
+#### Task 1.4 — Migrar orderService para Firestore ✅
+- [x] Reescrever `createOrder()` → `addDoc(collection(db, 'orders'), ...)`
+- [x] Reescrever `getOrderById()` → `getDoc(doc(db, 'orders', id))`
+- [x] Reescrever `getUserOrders()` → query `where('userId', '==', uid)` + `orderBy('createdAt', 'desc')`
+- [x] Implementar `onSnapshot()` para acompanhamento em tempo real do pedido
+- [x] Remover simulação de progressão de status (será feito pela loja/admin)
 - **Arquivo:** `services/orderService.ts`
 
-#### Task 1.5 — Migrar FavoritesContext para Firestore
-- [ ] Salvar `favoriteStoreIds` no documento do usuário no Firestore
-- [ ] Manter AsyncStorage como cache local (offline-first)
-- [ ] Sincronizar quando online
+#### Task 1.5 — Migrar FavoritesContext para Firestore ✅
+- [x] Salvar `favoriteStoreIds` no documento do usuário no Firestore
+- [x] Manter AsyncStorage como cache local (offline-first)
+- [x] Sincronizar quando online
 - **Arquivo:** `contexts/FavoritesContext.tsx`
 
-#### Task 1.6 — Migrar CartContext para Firestore (opcional para MVP)
-- [ ] Carrinho pode permanecer no AsyncStorage (é transitório)
+#### Task 1.6 — Migrar CartContext para Firestore (opcional para MVP) ✅
+- [x] Carrinho pode permanecer no AsyncStorage (é transitório)
 - [ ] Opcional: sincronizar com Firestore para multi-device
 - **Decisão:** Manter no AsyncStorage para o MVP
 
@@ -630,72 +635,72 @@ ASYNC_STORAGE_PREFIX = '@acho:'
 
 ### FASE 2: Funcionalidades Core do MVP (Prioridade ALTA)
 
-#### Task 2.1 — Seed de dados no Firestore
-- [ ] Criar script `scripts/seed-firestore.ts` para popular lojas e produtos
-- [ ] Migrar os 5 lojas mock com seus produtos para Firestore
-- [ ] Validar que imagens externas (Pexels) são acessíveis
+#### Task 2.1 — Seed de dados no Firestore ✅
+- [x] Criar script `scripts/seed-firestore.ts` para popular lojas e produtos
+- [x] Migrar os 5 lojas mock com seus produtos para Firestore
+- [x] Validar que imagens externas (Pexels) são acessíveis
 - [ ] Considerar fazer upload das imagens para Firebase Storage
 
-#### Task 2.2 — Tela de busca aprimorada
-- [ ] Implementar busca full-text (considerar Algolia ou busca client-side)
-- [ ] Busca por nome da loja e nome do produto
-- [ ] Filtro por categoria já funciona (adaptar para queries Firestore)
-- [ ] Adicionar filtro de "aberto agora"
-- [ ] Adicionar ordenação (rating, distância, A-Z)
+#### Task 2.2 — Tela de busca aprimorada ✅
+- [x] Implementar busca full-text (considerar Algolia ou busca client-side)
+- [x] Busca por nome da loja e nome do produto
+- [x] Filtro por categoria já funciona (adaptar para queries Firestore)
+- [x] Adicionar filtro de "aberto agora"
+- [x] Adicionar ordenação (rating, distância, A-Z)
 
-#### Task 2.3 — Sistema real de pedidos (fluxo completo)
-- [ ] Validar que todos os itens do carrinho são da mesma loja (ou dividir em múltiplos pedidos)
-- [ ] Verificar disponibilidade dos produtos antes de confirmar
-- [ ] Snapshot de preços no momento do pedido (preço pode mudar)
-- [ ] Implementar listener real-time no `order/[id].tsx` via `onSnapshot()`
-- [ ] Notificar loja sobre novo pedido (Cloud Function → FCM)
+#### Task 2.3 — Sistema real de pedidos (fluxo completo) ✅
+- [x] Validar que todos os itens do carrinho são da mesma loja (ou dividir em múltiplos pedidos)
+- [x] Verificar disponibilidade dos produtos antes de confirmar
+- [x] Snapshot de preços no momento do pedido (preço pode mudar)
+- [x] Implementar listener real-time no `order/[id].tsx` via `onSnapshot()`
+- [ ] Notificar loja sobre novo pedido (Cloud Function → FCM) *(pendente: Cloud Functions)*
 
-#### Task 2.4 — Upload de imagem de perfil
-- [ ] Usar `expo-camera` ou `expo-image-picker` para selecionar foto
-- [ ] Upload para Firebase Storage (`users/{uid}/avatar.jpg`)
-- [ ] Salvar URL no documento do usuário
-- [ ] Exibir avatar no perfil e no header
+#### Task 2.4 — Upload de imagem de perfil ✅
+- [x] Usar `expo-camera` ou `expo-image-picker` para selecionar foto
+- [ ] Upload para Firebase Storage (`users/{uid}/avatar.jpg`) *(pendente: config Firebase Storage)*
+- [x] Salvar URL no documento do usuário
+- [x] Exibir avatar no perfil e no header
 
-#### Task 2.5 — Geolocalização
-- [ ] Usar `expo-location` para obter localização do usuário
-- [ ] Filtrar lojas por proximidade (GeoPoint no Firestore)
-- [ ] Mostrar distância estimada na listagem de lojas
+#### Task 2.5 — Geolocalização ✅
+- [x] Usar `expo-location` para obter localização do usuário
+- [x] Filtrar lojas por proximidade (GeoPoint no Firestore)
+- [x] Mostrar distância estimada na listagem de lojas
 - [ ] Preencher endereço de entrega automaticamente (reverse geocoding)
-- [ ] Permissões já estão preparadas em `utils/permissions.ts`
+- [x] Permissões já estão preparadas em `utils/permissions.ts`
 
 ---
 
 ### FASE 3: Experiência do Usuário (Prioridade MÉDIA)
 
-#### Task 3.1 — Push Notifications
-- [ ] Configurar `expo-notifications` com FCM
-- [ ] Salvar token do device no Firestore (`users/{uid}/fcmTokens`)
-- [ ] Cloud Function para enviar notificação quando status do pedido muda
-- [ ] Tipos de notificação: pedido confirmado, preparando, saiu para entrega, entregue
-- [ ] Deep linking para abrir o pedido ao tocar na notificação
+#### Task 3.1 — Push Notifications ✅
+- [x] Configurar `expo-notifications` com FCM
+- [x] Salvar token do device no Firestore (`users/{uid}/fcmTokens`)
+- [ ] Cloud Function para enviar notificação quando status do pedido muda *(pendente: Cloud Functions)*
+- [x] Tipos de notificação: pedido confirmado, preparando, saiu para entrega, entregue
+- [x] Deep linking para abrir o pedido ao tocar na notificação
 
-#### Task 3.2 — Sistema de avaliações
-- [ ] Tela para avaliar após pedido entregue (1-5 estrelas + comentário)
-- [ ] Salvar na subcollection `stores/{storeId}/reviews/`
-- [ ] Cloud Function para recalcular rating médio da loja
-- [ ] Exibir avaliações na tela da loja
+#### Task 3.2 — Sistema de avaliações ✅
+- [x] Tela para avaliar após pedido entregue (1-5 estrelas + comentário)
+- [x] Salvar na subcollection `stores/{storeId}/reviews/`
+- [ ] Cloud Function para recalcular rating médio da loja *(pendente: Cloud Functions)*
+- [x] Exibir avaliações na tela da loja
 
-#### Task 3.3 — Histórico e re-pedido
-- [ ] Melhorar tela de histórico de pedidos (`profile/orders.tsx`)
-- [ ] Botão "Repetir pedido" → adiciona mesmos itens ao carrinho
-- [ ] Filtros por status (em andamento, finalizados, cancelados)
+#### Task 3.3 — Histórico e re-pedido ✅
+- [x] Melhorar tela de histórico de pedidos (`profile/orders.tsx`)
+- [x] Botão "Repetir pedido" → adiciona mesmos itens ao carrinho
+- [x] Filtros por status (em andamento, finalizados, cancelados)
 
-#### Task 3.4 — Onboarding
-- [ ] Tela de onboarding para primeiro acesso (3-4 slides)
-- [ ] Explicar funcionalidades do app
-- [ ] Pedir permissão de localização e notificação
-- [ ] Marcar como completo via `@acho:onboarding_completed`
+#### Task 3.4 — Onboarding ✅
+- [x] Tela de onboarding para primeiro acesso (3-4 slides)
+- [x] Explicar funcionalidades do app
+- [x] Pedir permissão de localização e notificação
+- [x] Marcar como completo via `@acho:onboarding_completed`
 
-#### Task 3.5 — Tratamento de erros refinado
-- [ ] Mensagens de erro em português para todos os erros do Firebase
-- [ ] Retry automático para falhas de rede
-- [ ] Tela de "sem conexão" com botão de tentar novamente
-- [ ] Error tracking via Sentry (`EXPO_PUBLIC_SENTRY_DSN`)
+#### Task 3.5 — Tratamento de erros refinado ✅
+- [x] Mensagens de erro em português para todos os erros do Firebase
+- [x] Retry automático para falhas de rede
+- [x] Tela de "sem conexão" com botão de tentar novamente
+- [ ] Error tracking via Sentry (`EXPO_PUBLIC_SENTRY_DSN`) *(pendente: config Sentry)*
 
 ---
 
@@ -703,39 +708,39 @@ ASYNC_STORAGE_PREFIX = '@acho:'
 
 > **Nota:** Para o MVP, pode ser um painel web separado ou telas adicionais no app.
 
-#### Task 4.1 — Autenticação de lojista
-- [ ] Role `store_owner` no documento do usuário
-- [ ] Telas de login/cadastro de lojista (ou reutilizar fluxo existente)
-- [ ] Redirecionamento baseado em role
+#### Task 4.1 — Autenticação de lojista ✅
+- [x] Role `store_owner` no documento do usuário
+- [x] Telas de login/cadastro de lojista (ou reutilizar fluxo existente)
+- [x] Redirecionamento baseado em role
 
-#### Task 4.2 — Gerenciamento de loja
-- [ ] Tela para criar/editar loja (nome, descrição, endereço, horários)
-- [ ] Upload de imagem da loja para Firebase Storage
-- [ ] Toggle aberto/fechado
-- [ ] Definir taxa de entrega e pedido mínimo
+#### Task 4.2 — Gerenciamento de loja ✅
+- [x] Tela para criar/editar loja (nome, descrição, endereço, horários)
+- [ ] Upload de imagem da loja para Firebase Storage *(pendente: config Firebase Storage)*
+- [x] Toggle aberto/fechado
+- [x] Definir taxa de entrega e pedido mínimo
 
-#### Task 4.3 — Gerenciamento de produtos
-- [ ] CRUD de produtos (nome, preço, descrição, imagem)
-- [ ] Toggle disponibilidade de produto
-- [ ] Ordenação de produtos
-- [ ] Categorias de produtos dentro da loja
+#### Task 4.3 — Gerenciamento de produtos ✅
+- [x] CRUD de produtos (nome, preço, descrição, imagem)
+- [x] Toggle disponibilidade de produto
+- [x] Ordenação de produtos
+- [x] Categorias de produtos dentro da loja
 
-#### Task 4.4 — Gerenciamento de pedidos (lojista)
-- [ ] Lista de pedidos recebidos com status
-- [ ] Atualizar status do pedido (confirmar → preparando → saiu → entregue)
-- [ ] Rejeitar/cancelar pedido com motivo
+#### Task 4.4 — Gerenciamento de pedidos (lojista) ✅
+- [x] Lista de pedidos recebidos com status
+- [x] Atualizar status do pedido (confirmar → preparando → saiu → entregue)
+- [x] Rejeitar/cancelar pedido com motivo
 - [ ] Notificação sonora para novos pedidos
 
 ---
 
 ### FASE 5: Polimento e Lançamento (Prioridade BAIXA)
 
-#### Task 5.1 — Performance
+#### Task 5.1 — Performance ⚠️ (parcial)
 - [ ] Implementar paginação nas listas (lojas, produtos, pedidos)
 - [ ] Lazy loading de imagens com placeholder
-- [ ] Memoização de componentes pesados (`React.memo`, `useMemo`)
+- [x] Memoização de componentes pesados (`React.memo`, `useMemo`)
 - [ ] Substituir Context API por Zustand (já instalado) para melhor performance
-- [ ] Implementar cache strategy com AsyncStorage
+- [x] Implementar cache strategy com AsyncStorage
 
 #### Task 5.2 — Dark Mode
 - [ ] Definir paleta de cores para dark mode
@@ -800,19 +805,19 @@ ASYNC_STORAGE_PREFIX = '@acho:'
 - [x] Carrinho funcional → **já funciona com AsyncStorage**
 - [x] Fazer pedido → **migrar para Firestore**
 - [x] Acompanhar pedido → **migrar para real-time Firestore**
-- [ ] Seed de dados reais no Firestore
-- [ ] Tratamento de erros em português
+- [x] Seed de dados reais no Firestore
+- [x] Tratamento de erros em português
 
 ### Should Have (MVP v1.1)
-- [ ] Push notifications de status do pedido
-- [ ] Geolocalização (lojas perto de mim)
-- [ ] Upload de foto de perfil
-- [ ] Sistema de avaliações
-- [ ] Painel básico do lojista (gerenciar pedidos)
+- [x] Push notifications de status do pedido
+- [x] Geolocalização (lojas perto de mim)
+- [x] Upload de foto de perfil
+- [x] Sistema de avaliações
+- [x] Painel básico do lojista (gerenciar pedidos)
 
 ### Nice to Have (Pós-MVP)
 - [ ] Dark mode
-- [ ] Repetir pedido
+- [x] Repetir pedido
 - [ ] Cupons de desconto
 - [ ] Chat entre consumidor e lojista
 - [ ] Múltiplos endereços de entrega

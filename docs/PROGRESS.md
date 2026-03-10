@@ -1,9 +1,8 @@
 # Achô! — Progresso de Implementação
 
 > **Branch:** `alteracoes-dav`  
-> **Último commit:** `023d623` — feat: implementa tasks do roadmap (Fases 1-5)  
-> **Data:** 09/03/2026  
-> **Push pendente:** Sim (erro 403 — credenciais Git apontam para `hdldev123`, repo é de `davydsonmr1`)
+> **Data:** 10/03/2026  
+> **Push:** ✅ Concluído — branch no GitHub
 
 ---
 
@@ -73,18 +72,13 @@
 
 ## 🚧 Pendências para Próxima Sessão
 
-### Crítico (bloqueante)
-1. **`expo-image-picker` não instalado** — o build falha ao resolver o módulo em `app/profile/edit.tsx`. Rodar:
-   ```bash
-   npx expo install expo-image-picker
-   ```
-2. **Push para remote** — credenciais Git incorretas. Corrigir autenticação (`git credential-manager` ou trocar remote URL para SSH) e rodar:
-   ```bash
-   git push -u origin alteracoes-dav
-   ```
+### ✅ Resolvido
+1. ~~`expo-image-picker` não instalado~~ — Instalado via `npx expo install expo-image-picker`
+2. ~~Push para remote~~ — Resolvido (URL com username explícito + autenticação via browser)
+3. ~~Build falhando~~ — `npx expo export --platform web` compila com sucesso
 
 ### Verificação necessária
-3. **Testar o app** — Após instalar `expo-image-picker`, rodar `npx expo start --clear` e verificar:
+4. **Testar o app** — Rodar `npx expo start --clear` e verificar:
    - Fluxo de onboarding (primeiro acesso)
    - Login/cadastro (modo mock)
    - Home com busca, filtros, ordenação
