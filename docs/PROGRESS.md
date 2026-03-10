@@ -133,3 +133,5 @@
 - `app/profile/orders.tsx` — filtros + repetir pedido
 - `components/StoreCard.tsx` — distância + React.memo
 - `components/CategoryFilter.tsx` — React.memo
+
+

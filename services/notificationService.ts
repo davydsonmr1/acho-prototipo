@@ -48,8 +48,16 @@ export async function registerForPushNotifications(): Promise<string | null> {
       });
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
-    const token = tokenData.data;
+    // projectId é necessário apenas em development builds com EAS
+    // Em Expo Go sem EAS configurado, isso pode falhar — ignoramos silenciosamente
+    let token: string | null = null;
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      token = tokenData.data;
+    } catch {
+      // Token de push não disponível (Expo Go sem EAS ou emulador)
+      return null;
+    }
 
     await AsyncStorage.setItem(FCM_TOKEN_KEY, token);
 

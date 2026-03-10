@@ -32,11 +32,12 @@ function RootLayoutNav() {
     const inOnboarding = segments[0] === 'onboarding';
 
     if (!onboardingDone && !inOnboarding) {
+      // Onboarding tem prioridade: não redirecionar para tabs enquanto não terminar
       router.replace('/onboarding');
-    } else if (onboardingDone && !user && !inAuthGroup && !inOnboarding) {
+    } else if (onboardingDone && !user && !inAuthGroup) {
       analytics.trackScreenView('auth_redirect');
       router.replace('/auth');
-    } else if (user && (inAuthGroup || inOnboarding)) {
+    } else if (onboardingDone && user && inAuthGroup) {
       analytics.trackScreenView('home_redirect');
       router.replace('/(tabs)');
     }

@@ -1,9 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, initializeAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-// @ts-ignore - AsyncStorage persistence may not be available on all platforms
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -27,15 +25,8 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-    // Auth com persistência via AsyncStorage
-    try {
-      const { getReactNativePersistence } = require('firebase/auth');
-      auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage),
-      });
-    } catch {
-      auth = getAuth(app);
-    }
+    // Usa getAuth — compatível com Expo Go e development builds
+    auth = getAuth(app);
 
     db = getFirestore(app);
     storage = getStorage(app);
