@@ -15,6 +15,11 @@ import { router } from 'expo-router';
 // Necessário para fechar o browser após o redirect do OAuth
 WebBrowser.maybeCompleteAuthSession();
 
+const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || undefined;
+const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || undefined;
+const isConfigured = !!webClientId;
+
 interface Props {
   label?: string;
 }
@@ -24,9 +29,9 @@ export default function GoogleSignInButton({ label = 'Continuar com Google' }: P
   const [loading, setLoading] = useState(false);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+    webClientId,
+    androidClientId,
+    iosClientId,
   });
 
   useEffect(() => {
@@ -46,17 +51,28 @@ export default function GoogleSignInButton({ label = 'Continuar com Google' }: P
     }
   }, [response]);
 
+  const handlePress = () => {
+    if (!isConfigured) {
+      Alert.alert(
+        'Google Sign-In não configurado',
+        'Para usar o login com Google, adicione o EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID no arquivo .env.\n\nObtemos no Firebase Console → Authentication → Google → Web client ID.',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
+    promptAsync();
+  };
+
   return (
     <TouchableOpacity
-      style={[styles.button, (!request || loading) && styles.buttonDisabled]}
-      onPress={() => promptAsync()}
-      disabled={!request || loading}
+      style={[styles.button, loading && styles.buttonLoading]}
+      onPress={handlePress}
+      disabled={loading}
     >
       {loading ? (
         <ActivityIndicator color="#1F2937" size="small" />
       ) : (
         <View style={styles.inner}>
-          {/* Ícone G estilizado */}
           <View style={styles.googleLogo}>
             <Text style={styles.googleLogoBlue}>G</Text>
           </View>
@@ -76,8 +92,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  buttonLoading: {
+    opacity: 0.6,
   },
   inner: {
     flexDirection: 'row',
@@ -104,4 +120,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
   },
+});
+
 });
